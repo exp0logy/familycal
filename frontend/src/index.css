@@ -1,0 +1,201 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Family Organiser — global stylesheet
+   Tailwind layers + premium dark-mode-first base resets
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base layer: resets + sensible defaults ─────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    /* Prevent font boosting on mobile */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Smooth scrolling across the app */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: theme('colors.surface.0');
+    color: theme('colors.text.primary');
+    font-family: theme('fontFamily.sans');
+    /* Subpixel antialiasing looks better on dark backgrounds */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent pull-to-refresh on tablet/touch displays */
+    overscroll-behavior: none;
+  }
+
+  /* Remove default focus outline; our components add their own */
+  :focus {
+    outline: none;
+  }
+
+  /* Accessible focus ring — only show for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid theme('colors.accent.500');
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Selection color */
+  ::selection {
+    background-color: theme('colors.accent.500');
+    color: #fff;
+  }
+
+  /* Scrollbar styling for webkit (displayed on large screens) */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: theme('colors.surface.4');
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: theme('colors.surface.5');
+  }
+
+  /* Prevent text overflow by default */
+  p, h1, h2, h3, h4, h5, h6 {
+    overflow-wrap: break-word;
+  }
+}
+
+/* ── Component layer: reusable compound classes ─────────────────────────────── */
+@layer components {
+  /* Card surface — use as a base for the Card component */
+  .card-base {
+    @apply bg-surface-1 rounded-card shadow-card border border-surface-4/50;
+  }
+
+  /* Elevated card (modals, overlays) */
+  .card-elevated {
+    @apply bg-surface-2 rounded-card shadow-card-lg border border-surface-4;
+  }
+
+  /* Glass morphism surface */
+  .card-glass {
+    @apply rounded-card border border-white/10 shadow-card;
+    background: rgba(17, 19, 24, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Input field base */
+  .input-base {
+    @apply bg-surface-3 border border-surface-4 rounded-lg px-4 py-2.5
+           text-text-primary placeholder:text-text-muted
+           focus:border-accent-500 focus:ring-1 focus:ring-accent-500/50
+           transition-colors duration-[200ms];
+  }
+
+  /* Minimum touch target wrapper */
+  .touch-target {
+    @apply flex items-center justify-center min-h-[44px] min-w-[44px];
+  }
+
+  /* Status indicator dot */
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full flex-shrink-0;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-surface-4/60;
+  }
+
+  /* Section label — small allcaps label above a group of settings */
+  .section-label {
+    @apply text-label text-text-muted tracking-widest uppercase;
+  }
+
+  /* Shimmer skeleton loading placeholder */
+  .skeleton {
+    @apply rounded bg-surface-3 overflow-hidden relative;
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.04) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s linear infinite;
+  }
+}
+
+/* ── Utility layer: one-off helpers ─────────────────────────────────────────── */
+@layer utilities {
+  /* No user-select for UI elements that shouldn't be selectable */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Truncate with ellipsis on single line */
+  .truncate-1 {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Clamp to n lines */
+  .clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Full-bleed: extend to screen edges even within a padded container */
+  .full-bleed {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+  }
+
+  /* Visually hidden but accessible to screen readers */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Smooth transition shorthand */
+  .transition-base {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}

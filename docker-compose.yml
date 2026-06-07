@@ -1,0 +1,56 @@
+# Family Organiser — local LAN deployment
+# Usage:
+#   1. cp .env.example .env  &&  edit .env  (set SECRET_KEY, PUBLIC_BASE_URL, OAuth creds)
+#   2. docker compose up -d --build
+#   3. open http://<this-machine-LAN-IP>/   (frontend on :80, backend on :8000)
+#
+# The ./data directory is a shared volume holding the SQLite db and the cached photos,
+# so your data survives container rebuilds.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: familycal-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Inside the container the data dir is fixed; the host path is the volume below.
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    ports:
+      # Exposed so OAuth redirects and direct API access work across the LAN.
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/system/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked into the static build. Relative paths so nginx proxies to backend.
+        VITE_API_BASE: /api
+        VITE_WS_BASE: /ws
+    container_name: familycal-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# Named volume alternative is intentionally avoided: a bind mount to ./data makes the
+# SQLite db and photo cache easy to back up from the host.

@@ -1,0 +1,31 @@
+# ── Secrets / env ─────────────────────────────────────────────
+.env
+*.env
+!.env.example
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Node / frontend ───────────────────────────────────────────
+node_modules/
+frontend/dist/
+*.local
+
+# ── Runtime data (db + cached photos) ─────────────────────────
+data/*.db
+data/*.db-*
+data/photos/*
+!data/photos/.gitkeep
+
+# ── Editors / OS ──────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
