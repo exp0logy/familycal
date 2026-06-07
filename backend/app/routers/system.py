@@ -31,6 +31,19 @@ async def health() -> HealthResponse:
     return HealthResponse(version=APP_VERSION)
 
 
+@router.post("/reload")
+async def reload_clients() -> dict:
+    """Tell every connected dashboard to reload the page.
+
+    Intended for kiosk displays that have no visible UI to refresh manually:
+    after a deploy, POST here (or have the deploy do it) and all screens pick up
+    the new build. Clients listen for the ``client.reload`` WebSocket event.
+    """
+    await manager.broadcast("client.reload", "system", {"version": APP_VERSION})
+    logger.info("Broadcast client.reload to %d client(s)", manager.client_count)
+    return {"reloaded": manager.client_count}
+
+
 @router.get("/status", response_model=SystemStatusResponse)
 async def status(
     request: Request,

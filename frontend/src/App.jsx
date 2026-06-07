@@ -32,6 +32,16 @@ const App = () => {
   // ── Keep the display awake (no-op on insecure-context HTTP; see useWakeLock) ──
   useWakeLock(true);
 
+  // ── Server-triggered reload (for kiosk screens with no refresh button) ───────
+  // Backend broadcasts `client.reload` (e.g. after a deploy via
+  // POST /api/system/reload); every connected dashboard reloads to the new build.
+  useEffect(() => {
+    const unsub = wsClient.on('client.reload', () => {
+      window.location.reload();
+    });
+    return unsub;
+  }, []);
+
   // ── Navigation helpers passed to child pages ───────────────────────────────
   const goHome     = useCallback(() => setPage(PAGES.home),       []);
   const goSettings = useCallback(() => setPage(PAGES.settings),   []);
