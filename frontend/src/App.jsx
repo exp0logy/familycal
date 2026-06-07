@@ -9,6 +9,7 @@ import wsClient from './api/ws';
 import Home from './pages/Home';
 import Screensaver from './pages/Screensaver';
 import Settings from './pages/Settings';
+import OnScreenKeyboard from './components/OnScreenKeyboard';
 
 // Pages the app can display
 const PAGES = {
@@ -55,6 +56,9 @@ const App = () => {
           onBack={goHome}
         />
       )}
+
+      {/* Global touch keyboard — auto-shows when a text field is tapped on a touchscreen. */}
+      <OnScreenKeyboard />
     </div>
   );
 };
