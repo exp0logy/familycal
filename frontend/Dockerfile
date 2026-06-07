@@ -22,6 +22,9 @@ RUN npm run build
 # ── Stage 2: serve ──────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine
 
+# openssl is needed to auto-generate the self-signed TLS cert at startup.
+RUN apk add --no-cache openssl
+
 # Copy the Vite dist output
 COPY --from=builder /app/dist /usr/share/nginx/html
 
@@ -29,7 +32,11 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/app.conf
 
-EXPOSE 80
+# Cert generator runs before nginx starts (nginx:alpine /docker-entrypoint.d/).
+COPY 40-gen-tls-cert.sh /docker-entrypoint.d/40-gen-tls-cert.sh
+RUN chmod +x /docker-entrypoint.d/40-gen-tls-cert.sh
+
+EXPOSE 80 443
 
 # nginx runs as PID 1; use daemon off so Docker can manage the process
 CMD ["nginx", "-g", "daemon off;"]

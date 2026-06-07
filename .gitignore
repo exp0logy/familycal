@@ -29,3 +29,7 @@ data/photos/*
 .idea/
 .vscode/
 *.swp
+
+# ── TLS certs (never commit) ──────────────────────────────────
+certs/*.pem
+!certs/.gitkeep

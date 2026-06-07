@@ -43,10 +43,21 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      # Hostname for the auto-generated self-signed TLS cert (CN/SAN). Set this to
+      # the domain you load the dashboard at, e.g. home.exp0logy.dev. Drop a real
+      # cert at ./certs/{cert,key}.pem to override the self-signed one.
+      TLS_HOSTNAME: ${TLS_HOSTNAME:-localhost}
+      TLS_IP: ${TLS_IP:-}
+    volumes:
+      # Persist the TLS cert across rebuilds; mount your Let's Encrypt cert here as
+      # cert.pem / key.pem to replace the self-signed one (no browser warnings).
+      - ./certs:/etc/nginx/certs
     ports:
       - "80:80"
+      - "443:443"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://localhost:443/"]
       interval: 30s
       timeout: 5s
       retries: 5
