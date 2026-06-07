@@ -113,8 +113,11 @@ const Home = ({ onSettings, onScreensaver }) => {
   const containerRef = useRef(null);
 
   // ── Screensaver idle timer ────────────────────────────────────────────────────
+  // Passing 0 disables the timer (useIdle no-ops on <= 0) when the screensaver
+  // is turned off in Settings.
   const { value: idleTimeout } = useSettings('display.screensaver_timeout_s', 300);
-  useIdle(idleTimeout * 1000, onScreensaver);
+  const { value: saverEnabled } = useSettings('display.screensaver_enabled', true);
+  useIdle(saverEnabled === false ? 0 : idleTimeout * 1000, onScreensaver);
 
   // ── Profile list ──────────────────────────────────────────────────────────────
   const profileFetcher = useCallback(() => ApiClient.getProfiles(), []);

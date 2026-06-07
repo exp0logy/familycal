@@ -10,6 +10,7 @@ import Home from './pages/Home';
 import Screensaver from './pages/Screensaver';
 import Settings from './pages/Settings';
 import OnScreenKeyboard from './components/OnScreenKeyboard';
+import useWakeLock from './hooks/useWakeLock';
 
 // Pages the app can display
 const PAGES = {
@@ -27,6 +28,9 @@ const App = () => {
     wsClient.connect();
     return () => wsClient.disconnect();
   }, []);
+
+  // ── Keep the display awake (no-op on insecure-context HTTP; see useWakeLock) ──
+  useWakeLock(true);
 
   // ── Navigation helpers passed to child pages ───────────────────────────────
   const goHome     = useCallback(() => setPage(PAGES.home),       []);

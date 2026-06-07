@@ -574,7 +574,10 @@ const WeatherSection = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ScreensaverSection = () => {
-  const { value: timeout, set: setTimeout_, loading } = useSettings('display.screensaver_timeout_s', 300);
+  const { value: enabled, set: setEnabled, loading: loadingEnabled } =
+    useSettings('display.screensaver_enabled', true);
+  const { value: timeout, set: setTimeout_, loading } =
+    useSettings('display.screensaver_timeout_s', 300);
   const [draft, setDraft] = useState('');
 
   useEffect(() => {
@@ -586,9 +589,24 @@ const ScreensaverSection = () => {
     if (!isNaN(mins) && mins >= 1) await setTimeout_(mins * 60);
   };
 
+  const isOff = enabled === false;
+
   return (
     <Card title="Screensaver" subtitle="Starts after inactivity when the dashboard is displayed." padding="md">
-      <div className="flex items-center gap-3">
+      <Toggle
+        checked={!isOff}
+        onChange={(v) => setEnabled(v)}
+        disabled={loadingEnabled}
+        label="Enable screensaver"
+        description="Show the full-screen photo slideshow after a period of inactivity."
+      />
+
+      <div
+        className={`flex items-center gap-3 mt-5 transition-opacity duration-200 ${
+          isOff ? 'opacity-40 pointer-events-none' : ''
+        }`}
+        aria-hidden={isOff}
+      >
         <TextInput
           label="Idle timeout (minutes)"
           type="number"
@@ -596,11 +614,13 @@ const ScreensaverSection = () => {
           onChange={(e) => setDraft(e.target.value)}
           description="Minimum 1 minute"
           className="flex-1"
+          disabled={isOff}
         />
         <Button
           variant="secondary"
           className="mt-6 flex-shrink-0"
           onClick={handleSave}
+          disabled={isOff}
         >
           Save
         </Button>
