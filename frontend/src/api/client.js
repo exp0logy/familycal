@@ -184,6 +184,19 @@ const ApiClient = {
   /** @param {'google'|'microsoft'} provider @returns {Promise<null>} */
   revokeOAuth: (provider) => del(`/oauth/${provider}`),
 
+  /**
+   * Non-secret OAuth app config (whether client id/secret exist + the redirect URI to register).
+   * @param {'google'|'microsoft'} provider
+   * @returns {Promise<{provider,configured,source,redirect_uri,client_id_hint,tenant_id}>}
+   */
+  getOAuthConfig: (provider) => get(`/oauth/${provider}/config`),
+
+  /** Store the provider's client id/secret (encrypted, server-side). */
+  setOAuthCredentials: (provider, body) => put(`/oauth/${provider}/credentials`, body),
+
+  /** Clear GUI-stored app credentials (.env fallback remains). */
+  clearOAuthCredentials: (provider) => del(`/oauth/${provider}/credentials`),
+
   // ── System ─────────────────────────────────────────────────────────────────
 
   /** @returns {Promise<{ status: string, version: string, time: string }>} */

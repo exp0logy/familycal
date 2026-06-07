@@ -276,23 +276,41 @@ const CalDAVForm = ({ onAdd, onCancel }) => {
   );
 };
 
+const OAUTH_HELP = {
+  google: 'Create an OAuth 2.0 Web client in Google Cloud Console (enable Calendar API + Photos Library API). One Google connection covers both calendar and photos.',
+  microsoft: 'Register an app in Microsoft Entra ID (Graph delegated scope Calendars.ReadWrite, offline_access).',
+};
+
 const OAuthButton = ({ provider, label, icon, onConnect, onRevoke }) => {
   const [status, setStatus] = useState(null);
+  const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showSetup, setShowSetup] = useState(false);
+  const [creds, setCreds] = useState({ client_id: '', client_secret: '', tenant_id: 'common' });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    ApiClient.getOAuthStatus(provider)
-      .then(setStatus)
-      .catch(() => setStatus({ connected: false }))
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      ApiClient.getOAuthStatus(provider).catch(() => ({ connected: false })),
+      ApiClient.getOAuthConfig(provider).catch(() => ({ configured: false, source: 'none', redirect_uri: '' })),
+    ])
+      .then(([s, c]) => { setStatus(s); setConfig(c); })
       .finally(() => setLoading(false));
   }, [provider]);
 
+  useEffect(() => { load(); }, [load]);
+
   const handleConnect = async () => {
+    setErr(null);
     try {
       const { url } = await ApiClient.getOAuthUrl(provider);
+      onConnect?.();
       window.location.href = url;
     } catch (e) {
-      console.error('OAuth error:', e);
+      setErr(e?.detail || 'Could not start sign-in — check the credentials.');
     }
   };
 
@@ -300,38 +318,140 @@ const OAuthButton = ({ provider, label, icon, onConnect, onRevoke }) => {
     setLoading(true);
     try {
       await ApiClient.revokeOAuth(provider);
-      setStatus({ connected: false });
       onRevoke?.();
     } catch (e) {
       console.error('Revoke error:', e);
     } finally {
-      setLoading(false);
+      load();
     }
   };
 
+  const handleSaveCreds = async () => {
+    if (!creds.client_id.trim() || !creds.client_secret.trim()) {
+      setErr('Client ID and secret are required.');
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    try {
+      const body = provider === 'microsoft'
+        ? creds
+        : { client_id: creds.client_id, client_secret: creds.client_secret };
+      await ApiClient.setOAuthCredentials(provider, body);
+      setCreds({ client_id: '', client_secret: '', tenant_id: 'common' });
+      setShowSetup(false);
+      load();
+    } catch (e) {
+      setErr(e?.detail || 'Could not save credentials.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyRedirect = async () => {
+    try {
+      await navigator.clipboard.writeText(config?.redirect_uri || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable on plain-HTTP — user can select the text manually */
+    }
+  };
+
+  const configured = config?.configured;
+
   return (
-    <div className="flex items-center justify-between gap-3 py-3 border-b border-surface-4/40 last:border-0">
-      <div className="flex items-center gap-3">
-        <span className="text-2xl" aria-hidden="true">{icon}</span>
-        <div>
-          <p className="text-body font-medium text-text-primary">{label}</p>
-          {!loading && status?.account && (
-            <p className="text-body-sm text-text-secondary">{status.account}</p>
+    <div className="py-3 border-b border-surface-4/40 last:border-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-2xl" aria-hidden="true">{icon}</span>
+          <div className="min-w-0">
+            <p className="text-body font-medium text-text-primary">{label}</p>
+            {!loading && status?.account && (
+              <p className="text-body-sm text-text-secondary truncate">{status.account}</p>
+            )}
+            {!loading && !status?.connected && (
+              <p className="text-body-sm text-text-muted">
+                {configured
+                  ? `Credentials set${config?.source === 'env' ? ' (.env)' : ''} — ready to connect`
+                  : 'Not set up'}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {loading ? (
+            <Spinner size="sm" />
+          ) : status?.connected ? (
+            <>
+              <StatusDot status="ok" />
+              <Button variant="ghost" size="sm" onClick={handleRevoke}>Disconnect</Button>
+            </>
+          ) : configured ? (
+            <>
+              <Button variant="secondary" size="sm" onClick={handleConnect}>Connect</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowSetup((s) => !s)}>Edit</Button>
+            </>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => setShowSetup((s) => !s)}>Set up</Button>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {loading ? (
-          <Spinner size="sm" />
-        ) : status?.connected ? (
-          <>
-            <StatusDot status="ok" />
-            <Button variant="ghost" size="sm" onClick={handleRevoke}>Disconnect</Button>
-          </>
-        ) : (
-          <Button variant="secondary" size="sm" onClick={handleConnect}>Connect</Button>
-        )}
-      </div>
+
+      {err && <p className="text-body-sm text-warn mt-2">{err}</p>}
+
+      {/* Credential setup form */}
+      {showSetup && (
+        <div className="mt-3 p-3 rounded-lg bg-surface-2/60 border border-surface-4/40 space-y-3">
+          <p className="text-body-sm text-text-secondary">{OAUTH_HELP[provider]}</p>
+
+          <div>
+            <span className="text-caption font-medium text-text-muted block mb-1">
+              Authorized redirect URI — register this exactly with the provider:
+            </span>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-body-sm bg-surface-1 rounded px-2 py-1.5 break-all text-accent-300 select-all">
+                {config?.redirect_uri || '—'}
+              </code>
+              <Button variant="ghost" size="sm" onClick={copyRedirect}>
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+          </div>
+
+          <TextInput
+            label="Client ID"
+            value={creds.client_id}
+            onChange={(e) => setCreds({ ...creds, client_id: e.target.value })}
+            placeholder={provider === 'google' ? '…apps.googleusercontent.com' : 'Application (client) ID'}
+          />
+          <TextInput
+            label="Client secret"
+            type="password"
+            value={creds.client_secret}
+            onChange={(e) => setCreds({ ...creds, client_secret: e.target.value })}
+            placeholder="Client secret"
+          />
+          {provider === 'microsoft' && (
+            <TextInput
+              label="Directory (tenant) ID"
+              value={creds.tenant_id}
+              onChange={(e) => setCreds({ ...creds, tenant_id: e.target.value })}
+              placeholder="common"
+              description="Use 'common' for personal + work accounts."
+            />
+          )}
+
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" loading={saving} onClick={handleSaveCreds}>
+              Save credentials
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { setShowSetup(false); setErr(null); }}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

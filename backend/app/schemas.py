@@ -258,6 +258,23 @@ class OAuthStatusResponse(BaseModel):
     account: str | None = None
 
 
+class OAuthCredentialsIn(BaseModel):
+    """Client app credentials entered via the web GUI."""
+    client_id: str
+    client_secret: str
+    tenant_id: str | None = None   # Microsoft only
+
+
+class OAuthConfigResponse(BaseModel):
+    """Non-secret view of a provider's OAuth app configuration for the UI."""
+    provider: str
+    configured: bool               # client id + secret are present (gui or env)
+    source: str                    # "gui" | "env" | "none"
+    redirect_uri: str              # the exact URI to register with the provider
+    client_id_hint: str | None = None
+    tenant_id: str | None = None
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # WebSocket envelope
 # ══════════════════════════════════════════════════════════════════════════════
