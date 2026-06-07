@@ -17,6 +17,11 @@ RUN pip install --no-cache-dir --upgrade pip \
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM python:3.11-slim
 
+# gosu lets the entrypoint drop from root to the app user after fixing the
+# bind-mounted /data ownership (see docker-entrypoint.sh).
+RUN apt-get update && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user for the application.
 RUN addgroup --system familycal && adduser --system --ingroup familycal familycal
 
@@ -32,7 +37,11 @@ COPY plugins/   ./plugins/
 # Ensure the data directory exists and is writable by the non-root user.
 RUN mkdir -p /data/photos && chown -R familycal:familycal /data
 
-USER familycal
+# Entrypoint runs as root only to fix bind-mount /data ownership, then drops to
+# the non-root `familycal` user via gosu (see docker-entrypoint.sh). The app
+# process itself never runs as root.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV DATA_DIR=/data \
     HOST=0.0.0.0 \
@@ -44,6 +53,8 @@ EXPOSE 8000
 # start_period gives the app time to initialise the DB before checks begin.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/system/health')"
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Run the backend.  sys.path must include plugins/ for plugin imports.
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
