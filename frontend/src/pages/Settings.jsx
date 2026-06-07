@@ -495,10 +495,61 @@ const WeatherSection = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pluginSettings]);
 
+  // ── Town search → autofill coordinates (via Open-Meteo geocoding) ───────────
+  const [townQuery, setTownQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
+  const handleSearch = async () => {
+    const q = townQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchError(null);
+    setResults([]);
+    try {
+      const data = await ApiClient.getPluginData(
+        'weather',
+        `geocode?q=${encodeURIComponent(q)}`
+      );
+      const found = data?.results ?? [];
+      setResults(found);
+      if (found.length === 0) setSearchError('No matching places found.');
+    } catch (e) {
+      console.error('Geocode error:', e);
+      setSearchError('Search failed — check the connection and try again.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const pickResult = (r) => {
+    setForm((f) => ({
+      ...f,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      location_label: r.name || r.label,
+    }));
+    setResults([]);
+    setTownQuery('');
+  };
+
   const handleSave = async () => {
+    // The weather plugin validates latitude/longitude as numbers, but text
+    // inputs yield strings — coerce before saving.
+    const lat = parseFloat(form.latitude);
+    const lon = parseFloat(form.longitude);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+      setSearchError('Enter or search for a valid location before saving.');
+      return;
+    }
     setSaving(true);
     try {
-      await ApiClient.setPluginSettings('weather', form);
+      await ApiClient.setPluginSettings('weather', {
+        ...form,
+        latitude: lat,
+        longitude: lon,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -514,6 +565,53 @@ const WeatherSection = () => {
         <div className="py-6 flex justify-center"><Spinner /></div>
       ) : (
         <div className="space-y-4">
+          {/* Town search — autofills the coordinates below */}
+          <div>
+            <div className="flex items-end gap-2">
+              <TextInput
+                label="Search town or city"
+                value={townQuery}
+                onChange={(e) => setTownQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                placeholder="e.g. Ballarat"
+                description="Type a place name and search — no need to enter coordinates by hand."
+                className="flex-1"
+              />
+              <Button
+                variant="secondary"
+                className="mb-[2px] flex-shrink-0"
+                loading={searching}
+                onClick={handleSearch}
+                icon={<Icon name="map-pin" className="w-4 h-4" />}
+              >
+                Search
+              </Button>
+            </div>
+
+            {searchError && (
+              <p className="text-body-sm text-warn mt-2">{searchError}</p>
+            )}
+
+            {results.length > 0 && (
+              <ul className="mt-2 rounded-lg border border-surface-4/50 divide-y divide-surface-4/40 overflow-hidden">
+                {results.map((r, i) => (
+                  <li key={`${r.latitude},${r.longitude},${i}`}>
+                    <button
+                      type="button"
+                      onClick={() => pickResult(r)}
+                      className="w-full text-left px-3 py-2.5 hover:bg-surface-3/60 transition-colors"
+                    >
+                      <span className="text-body text-text-primary">{r.label}</span>
+                      <span className="block text-caption text-text-muted">
+                        {Number(r.latitude).toFixed(3)}, {Number(r.longitude).toFixed(3)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <TextInput
             label="Location name"
             value={form.location_label}
@@ -523,17 +621,21 @@ const WeatherSection = () => {
           <div className="grid grid-cols-2 gap-3">
             <TextInput
               label="Latitude"
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={form.latitude}
               onChange={(e) => setForm({ ...form, latitude: e.target.value })}
               placeholder="-37.8136"
+              description="Auto-filled by search"
             />
             <TextInput
               label="Longitude"
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={form.longitude}
               onChange={(e) => setForm({ ...form, longitude: e.target.value })}
               placeholder="144.9631"
+              description="Auto-filled by search"
             />
           </div>
           <div>

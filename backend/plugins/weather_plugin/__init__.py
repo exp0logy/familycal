@@ -50,7 +50,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 
 from app.plugins.base import Plugin, PluginContext, PluginManifest
 
@@ -124,6 +124,8 @@ _MANIFEST = PluginManifest(
 # ── Fetch logic ───────────────────────────────────────────────────────────────
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+# Free geocoding API (no key) — turns a town name into coordinates.
+OPEN_METEO_GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
 # Variables to request.
 _HOURLY_VARS = []
@@ -321,6 +323,44 @@ def _build_router(plugin_ref: WeatherPlugin) -> APIRouter:
                 "error": plugin_ref._last_error,
             }
         return plugin_ref._cache
+
+    @router.get("/geocode")
+    async def geocode(
+        q: str = Query(..., min_length=1, description="Town / place name to look up"),
+    ) -> dict[str, Any]:
+        """Resolve a place name to coordinates via Open-Meteo's geocoding API.
+
+        Lets the Settings UI autofill latitude/longitude from a town name, so no
+        one has to type signed decimal coordinates on a touchscreen.
+        """
+        ctx = plugin_ref._ctx
+        if ctx is None:
+            raise HTTPException(status_code=503, detail="Weather plugin not ready")
+        try:
+            resp = await ctx.http.get(
+                OPEN_METEO_GEOCODE_URL,
+                params={"name": q, "count": 5, "language": "en", "format": "json"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Geocoding failed: {exc}") from exc
+
+        results = []
+        for r in data.get("results") or []:
+            label = ", ".join(
+                p for p in (r.get("name"), r.get("admin1"), r.get("country")) if p
+            )
+            results.append({
+                "label": label,
+                "name": r.get("name"),
+                "latitude": r.get("latitude"),
+                "longitude": r.get("longitude"),
+                "country": r.get("country"),
+                "admin1": r.get("admin1"),
+                "timezone": r.get("timezone"),
+            })
+        return {"results": results}
 
     return router
 
